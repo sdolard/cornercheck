@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
-	"os"
 )
 
 // GET /ventes_immobilieres/offres/rhone_alpes/rhone/?f=a&th=1&ret=1 HTTP/1.1
@@ -30,22 +30,29 @@ import (
 // 	RMFD=011XQDCh6B06BZ|6207QX|6307px|61088K|62089t;
 // 	RMFS=011XQHtcU2080N;
 // 	is_new_search=1
+
 func main() {
-	s, err := runReq("http://www.leboncoin.fr/ventes_immobilieres/offres/rhone_alpes/rhone/?f=a&th=1&ret=1")
+	c := &http.Client{}
+	s, err := runReq(c, "http://www.leboncoin.fr/ventes_immobilieres/offres/rhone_alpes/rhone/?f=a&th=1&ret=1")
 	if err != nil {
-		fmt.Printf("%v\n", err)
-		os.Exit(1)
+		log.Printf("error reading string: %v", err)
+		return
 	}
 	fmt.Printf("%v\n", s)
 }
 
-func runReq(url string) (string, error) {
-	resp, err := http.Get(url)
+func addCookies(c *http.Client) {
+	url := &c.Jar.SetCookies(u, cookies)
+}
+
+func runReq(c *http.Client, url string) (string, error) {
+	addCookies(c)
+
+	resp, err := c.Get(url)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
-
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
