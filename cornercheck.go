@@ -1,13 +1,61 @@
 package main
 
 import (
+	"code.google.com/p/go.net/html"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
+	"strings"
 )
+
+const (
+	BASE_URL               = "http://www.leboncoin.fr"
+	DEFAULT_CATEGORY_INDEX = 0 // voitures
+	DEFAULT_REGION_INDEX   = 0 // rhone_alpes
+)
+
+var (
+	category string
+	region   string
+	area     string
+)
+
+func getCategories() []string {
+	return []string{
+		"voitures",
+		"motos",
+	}
+}
+
+type Region struct {
+	Name  string
+	Areas []string
+}
+
+func getRegions() []Region {
+	var RhoneAlpesAreas = []string{
+		"ain",
+		"ardeche",
+		"drome",
+		"isere",
+		"loire",
+		"rhone",
+		"savoie",
+		"haute_savoie",
+	}
+
+	return []Region{
+		{
+			"rhone_alpes",
+			RhoneAlpesAreas,
+		},
+	}
+}
 
 // GET /voitures/offres/rhone_alpes/rhone/?f=p&th=1&ps=8&pe=9&ms=50000&me=125000 HTTP/1.1
 // Host: www.leboncoin.fr
@@ -53,19 +101,6 @@ import (
 //  s=red1x490e57f2ad31c85f5fc275aa0354d81abdde2062;
 //  is_new_search=1
 
-func main() {
-	cookieJar, _ := cookiejar.New(nil)
-	c := &http.Client{
-		Jar: cookieJar,
-	}
-	s, err := runReq(c, "http://www.leboncoin.fr/voitures/offres/rhone_alpes/rhone/?f=p&th=1&ps=8&pe=9&ms=50000&me=125000")
-	if err != nil {
-		log.Printf("error reading string: %v", err)
-		return
-	}
-	fmt.Printf("%v\n", s)
-}
-
 func addCookies(c *http.Client, u string) error {
 	parsedUrl, err := url.Parse(u)
 	if err != nil {
@@ -80,7 +115,7 @@ func addCookies(c *http.Client, u string) error {
 	return nil
 }
 
-func runReq(c *http.Client, u string) (string, error) {
+func request(c *http.Client, u string) (string, error) {
 	//err := addCookies(c, u)
 	// if err != nil {
 	// 	return "", err
@@ -96,4 +131,100 @@ func runReq(c *http.Client, u string) (string, error) {
 		return "", err
 	}
 	return string(body), nil
+}
+
+func initHttpClient() *http.Client {
+	cookieJar, _ := cookiejar.New(nil)
+	return &http.Client{
+		Jar: cookieJar,
+	}
+}
+
+func categoriesIndexOf(v string) int {
+	for i, category := range getCategories() {
+		if v == category {
+			return i
+		}
+	}
+	return -1
+}
+
+func getRegionAndArea(v string) (string, string, error) {
+	for _, r := range getRegions() {
+		if v == r.Name {
+			return r.Name, "", nil
+		}
+
+		for _, area := range r.Areas {
+			if v == area {
+				return r.Name, area, nil
+			}
+		}
+	}
+	return "", "", fmt.Errorf("Invalid region: '%v'", v)
+}
+
+func initFlags() error {
+	flag.StringVar(&category, "category", getCategories()[DEFAULT_CATEGORY_INDEX], "Categories")
+	flag.StringVar(&region, "region", getRegions()[DEFAULT_REGION_INDEX].Name, "Regions")
+
+	flag.Parse()
+
+	// category
+	if categoriesIndexOf(category) == -1 {
+		return fmt.Errorf("Invalid category: '%v'", category)
+	}
+	log.Printf("category: %v", category)
+
+	// region
+	r, a, err := getRegionAndArea(region)
+	if err != nil {
+		return err
+	}
+	region = r
+	area = a
+	log.Printf("region: %v; area: %v", region, area)
+
+	return nil
+}
+
+func buildUrl() string {
+	url := fmt.Sprintf("%v/%v/offres/", BASE_URL, category)
+
+	if area == "" {
+		url += region
+	} else {
+		url += region + "/" + area
+	}
+	url += "/?f=p&th=1&ps=8&pe=9&ms=50000&me=125000"
+	log.Printf("url: %v", url)
+	return url
+}
+
+func printUsage() {
+	fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
+	flag.PrintDefaults()
+}
+
+func main() {
+	err := initFlags()
+	if err != nil {
+		log.Printf("%v", err)
+		printUsage()
+		return
+	}
+
+	s, err := request(initHttpClient(), buildUrl())
+	if err != nil {
+		log.Printf("Error running request: %v", err)
+		return
+	}
+
+	doc, err := html.Parse(strings.NewReader(s)) // TODO: Parse node
+	if err != nil {
+		log.Printf("Error parsing response: %v", err)
+		return
+	}
+
+	fmt.Printf("%v\n", s)
 }
