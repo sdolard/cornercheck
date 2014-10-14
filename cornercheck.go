@@ -214,15 +214,6 @@ func printUsage() {
 	flag.PrintDefaults()
 }
 
-func parseRequestedHTMLPage(page string) {
-	doc, err := html.Parse(strings.NewReader(page))
-	if err != nil {
-		log.Fatal(err)
-	}
-	list := getListRootNode(doc)
-	getNodes(list)
-}
-
 func getListRootNode(root *html.Node) *html.Node {
 	var list *html.Node
 	var f func(*html.Node)
@@ -243,59 +234,107 @@ func getListRootNode(root *html.Node) *html.Node {
 	return list
 }
 
-func getNodes(list *html.Node) {
-	var ann *Annonce
-	var state string
+func getAnnonceNodes(listRoot *html.Node) []*html.Node {
+	var nodes []*html.Node
+	for c := listRoot.FirstChild; c != nil; c = c.NextSibling {
+		if c.Type == html.ElementNode {
 
-	var ca = func(a *Annonce) *Annonce {
-		if a == nil {
-			a = new(Annonce)
-		}
-		return a
-	}
-	var f func(*html.Node)
-	f = func(n *html.Node) {
-		if n.Type == html.ElementNode {
-
-			if n.Data == "div" {
-				for _, a := range n.Attr {
-					if n.Parent == list && a.Key == "class" && a.Val == "clear" {
-						fmt.Printf("%v, %v, %v<br>\n", ann.Title, ann.HRef, ann.Date)
-						ann = nil
-						break
-					}
-
-					if a.Key == "class" && a.Val == "date" {
-						state = "date"
-						break
+			if c.Data == "a" {
+				nodes = append(nodes, c)
+			} else if c.Data == "div" {
+				for _, a := range c.Attr {
+					if a.Key != "class" && a.Val != "clear" {
+						panic(fmt.Sprintf("Unexpected annonces root node (format change ? Key = %v, Val=)", a.Key, a.Val))
 					}
 				}
+			} else {
+				panic(fmt.Sprintf("Unexpected annonces root node (format change ?, Data: %v)", c.Data))
 			}
-			if n.Data == "a" {
-				for _, a := range n.Attr {
-					switch a.Key {
-					case "href":
-						ann = ca(ann)
-						ann.HRef = a.Val
-					case "title":
-						ann = ca(ann)
-						ann.Title = a.Val
-					}
-				}
-			}
-		}
-		if n.Type == html.TextNode {
-			if state == "date" {
-				ann.Date = n.Data
-				state = ""
-			}
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			f(c)
 		}
 	}
-	f(list)
+	return nodes
 }
+
+func parseRequestedHTMLPage(page string) {
+	doc, err := html.Parse(strings.NewReader(page))
+	if err != nil {
+		log.Fatal(err)
+	}
+	listRootNode := getListRootNode(doc)
+
+	nodes := getAnnonceNodes(listRootNode)
+	fmt.Printf("Annonces: %v", len(nodes))
+	annnonces := extractAnnoncesData(nodes)
+	for _, ann := range annnonces {
+		fmt.Printf("%v, %v\n", ann.Title, ann.HRef)
+	}
+}
+
+func extractAnnoncesData(annNodes []*html.Node) []Annonce {
+	annonces := make([]Annonce, len(annNodes))
+	for i, annNode := range annNodes {
+		if annNode.Data == "a" {
+			for _, att := range annNode.Attr {
+				switch att.Key {
+				case "href":
+					annonces[i].HRef = att.Val
+				case "title":
+					annonces[i].Title = att.Val
+				}
+			}
+		}
+	}
+	return annonces
+}
+
+// func getAnnonceDataFromNode(ann []*html.Node) {
+// 	var ann *Annonce
+// 	var state string
+
+// 	var ca = func(a *Annonce) *Annonce {
+// 		if a == nil {
+// 			a = new(Annonce)
+// 		}
+// 		return a
+// 	}
+// 	var f func(*html.Node)
+// 	f = func(n *html.Node) {
+// 		if n.Type == html.ElementNode {
+
+// 			if n.Data == "div" {
+// 				for _, a := range n.Attr {
+// 					if n.Parent == list && a.Key == "class" && a.Val == "clear" {
+// 						fmt.Printf("%v, %v, %v<br>\n", ann.Title, ann.HRef, ann.Date)
+// 						ann = nil
+// 						break
+// 					}
+
+// 					if a.Key == "class" && a.Val == "date" {
+// 						state = "date"
+// 						break
+// 					}
+// 				}
+// 			}
+// 			if n.Data == "a" {
+// 				for _, a := range n.Attr {
+// 					switch a.Key {
+// 					case "href":
+// 						ann = ca(ann)
+// 						ann.HRef = a.Val
+// 					case "title":
+// 						ann = ca(ann)
+// 						ann.Title = a.Val
+// 					}
+// 				}
+// 			}
+// 		}
+// 		for c := n.FirstChild; c != nil; c = c.NextSibling {
+// 			f(c)
+// 		}
+// 	}
+
+// 	f(list)
+// }
 
 func main() {
 	err := initFlags()
