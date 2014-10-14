@@ -23,6 +23,7 @@ var (
 	category string
 	region   string
 	area     string
+	parse    bool
 )
 
 func getCategories() []string {
@@ -30,6 +31,12 @@ func getCategories() []string {
 		"voitures",
 		"motos",
 	}
+}
+
+type Annonce struct {
+	HRef  string
+	Title string
+	Date  string
 }
 
 type Region struct {
@@ -167,6 +174,7 @@ func getRegionAndArea(v string) (string, string, error) {
 func initFlags() error {
 	flag.StringVar(&category, "category", getCategories()[DEFAULT_CATEGORY_INDEX], "Categories")
 	flag.StringVar(&region, "region", getRegions()[DEFAULT_REGION_INDEX].Name, "Regions")
+	flag.BoolVar(&parse, "parse", true, "Parse")
 
 	flag.Parse()
 
@@ -206,6 +214,89 @@ func printUsage() {
 	flag.PrintDefaults()
 }
 
+func parseRequestedHTMLPage(page string) {
+	doc, err := html.Parse(strings.NewReader(page))
+	if err != nil {
+		log.Fatal(err)
+	}
+	list := getListRootNode(doc)
+	getNodes(list)
+}
+
+func getListRootNode(root *html.Node) *html.Node {
+	var list *html.Node
+	var f func(*html.Node)
+	f = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "div" {
+			for _, a := range n.Attr {
+				if a.Key == "class" && a.Val == "list-lbc" {
+					list = n
+					return
+				}
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			f(c)
+		}
+	}
+	f(root)
+	return list
+}
+
+func getNodes(list *html.Node) {
+	var ann *Annonce
+	var state string
+
+	var ca = func(a *Annonce) *Annonce {
+		if a == nil {
+			a = new(Annonce)
+		}
+		return a
+	}
+	var f func(*html.Node)
+	f = func(n *html.Node) {
+		if n.Type == html.ElementNode {
+
+			if n.Data == "div" {
+				for _, a := range n.Attr {
+					if n.Parent == list && a.Key == "class" && a.Val == "clear" {
+						fmt.Printf("%v, %v, %v<br>\n", ann.Title, ann.HRef, ann.Date)
+						ann = nil
+						break
+					}
+
+					if a.Key == "class" && a.Val == "date" {
+						state = "date"
+						break
+					}
+				}
+			}
+			if n.Data == "a" {
+				for _, a := range n.Attr {
+					switch a.Key {
+					case "href":
+						ann = ca(ann)
+						ann.HRef = a.Val
+					case "title":
+						ann = ca(ann)
+						ann.Title = a.Val
+					}
+				}
+			}
+		}
+		if n.Type == html.TextNode {
+			if state == "date" {
+				ann.Date = n.Data
+				state = ""
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			f(c)
+		}
+	}
+	f(list)
+}
+
 func main() {
 	err := initFlags()
 	if err != nil {
@@ -220,11 +311,9 @@ func main() {
 		return
 	}
 
-	doc, err := html.Parse(strings.NewReader(s)) // TODO: Parse node
-	if err != nil {
-		log.Printf("Error parsing response: %v", err)
-		return
+	if parse {
+		parseRequestedHTMLPage(s)
+	} else {
+		fmt.Printf("%v\n", s)
 	}
-
-	fmt.Printf("%v\n", s)
 }
