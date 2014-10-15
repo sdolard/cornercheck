@@ -10,13 +10,17 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 )
 
 const (
 	BASE_URL               = "http://www.leboncoin.fr"
 	DEFAULT_CATEGORY_INDEX = 0 // voitures
 	DEFAULT_REGION_INDEX   = 0 // rhone_alpes
+	DATE_YESTERDAY         = "Hier"
+	DATE_TODAY             = "Aujourd'hui"
 )
 
 var (
@@ -34,15 +38,38 @@ func getCategories() []string {
 }
 
 type Annonce struct {
-	HRef     string
-	Title    string
-	Date     string
-	Category string
+	HRef       string
+	Title      string
+	Time       time.Time
+	TimeString string
+	Category   string
 }
 
 type Region struct {
 	Name  string
 	Areas []string
+}
+
+type LbcDate struct {
+	Day  string
+	Hour string
+}
+
+func getLbcShortMonths() map[string]time.Month {
+	return map[string]time.Month{
+		"jan":  time.January,
+		"fev":  time.February,
+		"mar":  time.March,
+		"avr":  time.April,
+		"mai":  time.May,
+		"juin": time.June,
+		"juil": time.July,
+		"Aout": time.August,
+		"sept": time.September,
+		"oct":  time.October,
+		"nov":  time.November,
+		"dec":  time.December,
+	}
 }
 
 func getRegions() []Region {
@@ -269,11 +296,63 @@ func parseRequestedHTMLPage(page string) {
 	fmt.Printf("Annonces: %v\n", len(nodes))
 	annnonces := extractAnnoncesData(nodes)
 	for _, ann := range annnonces {
-		fmt.Printf("%v# %v: %v, %v\n", ann.Date, ann.Category, ann.Title, ann.HRef)
+		fmt.Printf("%v; %v# %v: %v, %v\n", ann.Time, ann.Category, ann.Title, ann.HRef)
 	}
 }
 
-func getAnnonceDate(annNode *html.Node) string {
+func lbcDateToTime(dayS, hourS string) (time.Time, string) {
+	now := time.Now()
+	year := now.Year()
+	month := now.Month()
+	day := now.Day()
+
+	// Hours > 13:52
+	decomposedHour := strings.Split(hourS, ":")
+	hour64, err := strconv.ParseInt(decomposedHour[0], 10, 0)
+	if err != nil {
+		panic(fmt.Sprintf("%v", err))
+	}
+	hour := int(hour64)
+	min64, err := strconv.ParseInt(decomposedHour[1], 10, 0)
+	if err != nil {
+		panic(fmt.Sprintf("%v", err))
+	}
+	min := int(min64)
+
+	// Day
+	if dayS == DATE_YESTERDAY {
+		// Hier 13:52
+		d := now.AddDate(0, 0, -1)
+		year = d.Year()
+		month = d.Month()
+		day = d.Day()
+	} else if dayS == DATE_TODAY {
+		// Aujourd'hui 13:52
+
+	} else {
+		// 28 sept
+		decomposedDay := strings.Split(dayS, " ")
+		day64, err := strconv.ParseInt(decomposedDay[0], 10, 0)
+		if err != nil {
+			panic(fmt.Sprintf("%v", err))
+		}
+		day = int(day64)
+		month = getLbcShortMonths()[decomposedDay[1]]
+	}
+
+	return time.Date(
+		year,
+		month,
+		day,
+		hour,
+		min,
+		0, // sec
+		0, // nsec,
+		now.Location(),
+	), fmt.Sprintf("%v %v", dayS, hourS)
+}
+
+func getAnnonceDate(annNode *html.Node) (time.Time, string) {
 	var date []string
 	collect := false
 	level := 0
@@ -283,7 +362,7 @@ func getAnnonceDate(annNode *html.Node) string {
 			if n.Type == html.TextNode {
 				data := strings.TrimSpace(n.Data)
 				if data != "" {
-					//fmt.Printf("Data: %v, level: %v\n", data, level)
+
 					date = append(date, data)
 				}
 			}
@@ -308,15 +387,7 @@ func getAnnonceDate(annNode *html.Node) string {
 		}
 	}
 	f(annNode)
-
-	ds := ""
-	for i, d := range date {
-		if i > 0 {
-			ds += " "
-		}
-		ds += d
-	}
-	return ds
+	return lbcDateToTime(date[0], date[1])
 }
 
 func extractAnnoncesData(annNodes []*html.Node) []Annonce {
@@ -334,7 +405,7 @@ func extractAnnoncesData(annNodes []*html.Node) []Annonce {
 				}
 			}
 
-			annonces[i].Date = getAnnonceDate(annNodes[i])
+			annonces[i].Time, annonces[i].TimeString = getAnnonceDate(annNodes[i])
 		} else {
 			panic("format change")
 		}
