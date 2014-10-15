@@ -2,6 +2,7 @@ package main
 
 import (
 	"code.google.com/p/go.net/html"
+	"code.google.com/p/go.net/html/charset"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -21,6 +22,7 @@ const (
 	DEFAULT_REGION_INDEX   = 0 // rhone_alpes
 	DATE_YESTERDAY         = "Hier"
 	DATE_TODAY             = "Aujourd'hui"
+	LBC_HTML_CHARSET       = "ISO 8859-15"
 )
 
 var (
@@ -64,7 +66,7 @@ func getLbcShortMonths() map[string]time.Month {
 		"mai":  time.May,
 		"juin": time.June,
 		"juil": time.July,
-		"Aout": time.August,
+		"août": time.August,
 		"sept": time.September,
 		"oct":  time.October,
 		"nov":  time.November,
@@ -161,7 +163,12 @@ func request(c *http.Client, u string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	reader, err := charset.NewReader(resp.Body, LBC_HTML_CHARSET)
+	if err != nil {
+		return "", err
+	}
+	//body, err := ioutil.ReadAll(resp.Body)
+	body, err := ioutil.ReadAll(reader)
 	if err != nil {
 		return "", err
 	}
@@ -233,7 +240,8 @@ func buildUrl() string {
 		url += region + "/" + area
 	}
 	//url += "/?f=p&th=1&ps=8&pe=9&ms=50000&me=125000"
-	url += "/?f=p&th=1&ps=8&pe=9"
+	//url += "/?f=p&th=1&ps=8&pe=9"
+	url += "/?o=110&th=1&ps=8&pe=9"
 
 	log.Printf("url: %v", url)
 	return url
@@ -291,12 +299,16 @@ func parseRequestedHTMLPage(page string) {
 		log.Fatal(err)
 	}
 	listRootNode := getListRootNode(doc)
+	if listRootNode == nil {
+		fmt.Printf("No annonces found\n")
+		return
+	}
 
 	nodes := getAnnonceNodes(listRootNode)
 	fmt.Printf("Annonces: %v\n", len(nodes))
 	annnonces := extractAnnoncesData(nodes)
 	for _, ann := range annnonces {
-		fmt.Printf("%v; %v# %v: %v, %v\n", ann.Time, ann.Category, ann.Title, ann.HRef)
+		fmt.Printf("%v# %v: %v, %v\n", ann.Time, ann.Category, ann.Title, ann.HRef)
 	}
 }
 
@@ -328,7 +340,7 @@ func lbcDateToTime(dayS, hourS string) (time.Time, string) {
 		day = d.Day()
 	} else if dayS == DATE_TODAY {
 		// Aujourd'hui 13:52
-
+		// Initialized data are valid for this case
 	} else {
 		// 28 sept
 		decomposedDay := strings.Split(dayS, " ")
@@ -338,6 +350,9 @@ func lbcDateToTime(dayS, hourS string) (time.Time, string) {
 		}
 		day = int(day64)
 		month = getLbcShortMonths()[decomposedDay[1]]
+		if month == 0 {
+			panic(fmt.Sprintf("Invalid month: %v", decomposedDay[1]))
+		}
 	}
 
 	return time.Date(
