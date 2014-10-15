@@ -30,6 +30,7 @@ var (
 	region   string
 	area     string
 	parse    bool
+	page     int
 )
 
 func getCategories() []string {
@@ -167,7 +168,6 @@ func request(c *http.Client, u string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	//body, err := ioutil.ReadAll(resp.Body)
 	body, err := ioutil.ReadAll(reader)
 	if err != nil {
 		return "", err
@@ -209,6 +209,7 @@ func getRegionAndArea(v string) (string, string, error) {
 func initFlags() error {
 	flag.StringVar(&category, "category", getCategories()[DEFAULT_CATEGORY_INDEX], "Categories")
 	flag.StringVar(&region, "region", getRegions()[DEFAULT_REGION_INDEX].Name, "Regions")
+	flag.IntVar(&page, "page", 0, "Page")
 	flag.BoolVar(&parse, "parse", true, "Parse")
 
 	flag.Parse()
@@ -241,7 +242,11 @@ func buildUrl() string {
 	}
 	//url += "/?f=p&th=1&ps=8&pe=9&ms=50000&me=125000"
 	//url += "/?f=p&th=1&ps=8&pe=9"
-	url += "/?o=110&th=1&ps=8&pe=9"
+	if page <= 1 {
+		url += "/?f=p&th=1&ps=8&pe=9"
+	} else {
+		url += fmt.Sprintf("/?o=%v&th=1&ps=8&pe=9", page)
+	}
 
 	log.Printf("url: %v", url)
 	return url
@@ -300,7 +305,7 @@ func parseRequestedHTMLPage(page string) {
 	}
 	listRootNode := getListRootNode(doc)
 	if listRootNode == nil {
-		fmt.Printf("No annonces found\n")
+		fmt.Printf("No annonce found\n")
 		return
 	}
 
