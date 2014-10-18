@@ -24,7 +24,7 @@ const (
 	DATE_YESTERDAY         = "Hier"
 	DATE_TODAY             = "Aujourd'hui"
 	LBC_HTML_CHARSET       = "ISO 8859-15"
-	TIME_LAYOUT            = "Jan 2, 2006 at 3:04pm"
+	TIME_LAYOUT            = "02 Jan 06 15:04"
 )
 
 type AppParams struct {
@@ -32,11 +32,9 @@ type AppParams struct {
 	Region   string
 	Area     string
 	Parse    bool
-	Page     int
 }
 
 var (
-	appParam AppParams
 	re_LbcId *regexp.Regexp
 )
 
@@ -252,47 +250,52 @@ func getRegionAndArea(v string) (string, string, error) {
 	return "", "", fmt.Errorf("Invalid region: '%v'", v)
 }
 
-func initFlags() error {
-	flag.StringVar(&appParam.Category, "category", getCategories()[DEFAULT_CATEGORY_INDEX], "Categories")
-	flag.StringVar(&appParam.Region, "region", getRegions()[DEFAULT_REGION_INDEX].Name, "Regions")
-	flag.IntVar(&appParam.Page, "page", 0, "Page")
-	flag.BoolVar(&appParam.Parse, "parse", true, "Parse")
+func initFlags() (AppParams, error) {
+	appParams := AppParams{
+		Category: getCategories()[DEFAULT_CATEGORY_INDEX],
+		Region:   getRegions()[DEFAULT_REGION_INDEX].Name,
+		Parse:    true,
+	}
+
+	flag.StringVar(&appParams.Category, "category", appParams.Category, "Categories")
+	flag.StringVar(&appParams.Region, "region", appParams.Region, "Regions")
+	flag.BoolVar(&appParams.Parse, "parse", appParams.Parse, "Parse")
 
 	flag.Parse()
 
 	// category
-	if categoriesIndexOf(appParam.Category) == -1 {
-		return fmt.Errorf("Invalid category: '%v'", appParam.Category)
+	if categoriesIndexOf(appParams.Category) == -1 {
+		return appParams, fmt.Errorf("Invalid category: '%v'", appParams.Category)
 	}
-	log.Printf("category: %v", appParam.Category)
+	log.Printf("category: %v", appParams.Category)
 
 	// region
-	r, a, err := getRegionAndArea(appParam.Region)
+	r, a, err := getRegionAndArea(appParams.Region)
 	if err != nil {
-		return err
+		return appParams, err
 	}
-	appParam.Region = r
-	appParam.Area = a
-	log.Printf("region: %v; area: %v", appParam.Region, appParam.Area)
+	appParams.Region = r
+	appParams.Area = a
+	log.Printf("region: %v; area: %v", appParams.Region, appParams.Area)
 
-	return nil
+	return appParams, nil
 }
 
-func buildUrl() string {
-	url := fmt.Sprintf("%v/%v/offres/", BASE_URL, appParam.Category)
+func buildUrl(appParams AppParams, page int) string {
+	url := fmt.Sprintf("%v/%v/offres/", BASE_URL, appParams.Category)
 
-	if appParam.Area == "" {
-		url += appParam.Region
+	if appParams.Area == "" {
+		url += appParams.Region
 	} else {
-		url += appParam.Region + "/" + appParam.Area
+		url += appParams.Region + "/" + appParams.Area
 	}
 	//url += "/?f=p&th=1&ps=8&pe=9&ms=50000&me=125000"
 	//url += "/?f=p&th=1&ps=8&pe=9"
 	//th=1 : enable thumb display
-	if appParam.Page <= 1 {
+	if page <= 1 {
 		url += "/?f=p&th=1&ps=8&pe=9"
 	} else {
-		url += fmt.Sprintf("/?o=%v&th=1&ps=8&pe=9", appParam.Page)
+		url += fmt.Sprintf("/?o=%v&th=1&ps=8&pe=9", page)
 	}
 
 	log.Printf("url: %v", url)
@@ -345,7 +348,7 @@ func getAnnonceNodes(listRoot *html.Node) []*html.Node {
 	return nodes
 }
 
-func parseRequestedHTMLPage(page string) {
+func parseRequestedHTMLPage(page string, category string) int {
 	doc, err := html.Parse(strings.NewReader(page))
 	if err != nil {
 		log.Fatal(err)
@@ -353,15 +356,16 @@ func parseRequestedHTMLPage(page string) {
 	listRootNode := getListRootNode(doc)
 	if listRootNode == nil {
 		fmt.Printf("No annonce found\n")
-		return
+		return 0
 	}
 
 	nodes := getAnnonceNodes(listRootNode)
 	fmt.Printf("Annonces: %v\n", len(nodes))
-	annnonces := extractAnnoncesData(nodes)
+	annnonces := extractAnnoncesData(nodes, category)
 	for _, ann := range annnonces {
 		fmt.Printf("%v# %v: %v, %v, %v\n", ann.Time.Format(TIME_LAYOUT), ann.Category, ann.Title, ann.LbcId(), ann.HRef)
 	}
+	return len(nodes)
 }
 
 func lbcDateToTime(dayS, hourS string) (time.Time, string) {
@@ -456,12 +460,12 @@ func getAnnonceDate(annNode *html.Node) (time.Time, string) {
 	return lbcDateToTime(date[0], date[1])
 }
 
-func extractAnnoncesData(annNodes []*html.Node) []Annonce {
+func extractAnnoncesData(annNodes []*html.Node, category string) []Annonce {
 	annonces := make([]Annonce, len(annNodes))
 
 	for i, annNode := range annNodes {
 		if annNode.Data == "a" {
-			annonces[i].Category = appParam.Category
+			annonces[i].Category = category
 			for _, att := range annNode.Attr {
 				switch att.Key {
 				case "href":
@@ -481,22 +485,27 @@ func extractAnnoncesData(annNodes []*html.Node) []Annonce {
 }
 
 func main() {
-	err := initFlags()
+	appParams, err := initFlags()
 	if err != nil {
 		log.Printf("%v", err)
 		printUsage()
 		return
 	}
 
-	s, err := request(initHttpClient(), buildUrl())
-	if err != nil {
-		log.Printf("Error running request: %v", err)
-		return
+	httpClient := initHttpClient()
+	page := 0
+	for {
+		s, err := request(httpClient, buildUrl(appParams, page))
+		if err != nil {
+			log.Printf("Error running request: %v", err)
+			return
+		}
+
+		annoncesCount := parseRequestedHTMLPage(s, appParams.Category)
+		if annoncesCount == 0 {
+			break
+		}
+		page++
 	}
 
-	if appParam.Parse {
-		parseRequestedHTMLPage(s)
-	} else {
-		fmt.Printf("%v\n", s)
-	}
 }
