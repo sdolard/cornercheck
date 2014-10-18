@@ -24,6 +24,7 @@ const (
 	DATE_YESTERDAY         = "Hier"
 	DATE_TODAY             = "Aujourd'hui"
 	LBC_HTML_CHARSET       = "ISO 8859-15"
+	TIME_LAYOUT            = "Jan 2, 2006 at 3:04pm"
 )
 
 type AppParams struct {
@@ -359,7 +360,7 @@ func parseRequestedHTMLPage(page string) {
 	fmt.Printf("Annonces: %v\n", len(nodes))
 	annnonces := extractAnnoncesData(nodes)
 	for _, ann := range annnonces {
-		fmt.Printf("%v# %v: %v, %v, %v\n", ann.Time, ann.Category, ann.Title, ann.LbcId(), ann.HRef)
+		fmt.Printf("%v# %v: %v, %v, %v\n", ann.Time.Format(TIME_LAYOUT), ann.Category, ann.Title, ann.LbcId(), ann.HRef)
 	}
 }
 
