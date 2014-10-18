@@ -11,6 +11,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -26,17 +27,27 @@ const (
 )
 
 var (
-	category string
-	region   string
-	area     string
-	parse    bool
-	page     int
+	paramCategory string
+	paramRegion   string
+	paramArea     string
+	paramParse    bool
+	paramPage     int
+	re_LbcId      *regexp.Regexp
 )
 
 func getCategories() []string {
 	return []string{
+		"_vehicules_",
 		"voitures",
 		"motos",
+		"_immobilier_",
+		"_multimedia_",
+		"_maison_",
+		"_loisirs_",
+		"_materiel_professionnel_",
+		"_emploi_services_",
+		"_",
+		"autres",
 	}
 }
 
@@ -46,6 +57,22 @@ type Annonce struct {
 	Time       time.Time
 	TimeString string
 	Category   string
+}
+
+func (a Annonce) LbcId() string {
+	//http://www.leboncoin.fr/voitures/719527156.htm?ca=22_s
+	u, err := url.Parse(a.HRef)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if re_LbcId == nil {
+		re_LbcId = regexp.MustCompile(".*/(\\d+)\\.htm")
+	}
+	subs := re_LbcId.FindStringSubmatch(u.Path)
+	if len(subs) < 2 || subs[1] == "" {
+		panic("Format error in LbcId")
+	}
+	return subs[1]
 }
 
 type Region struct {
@@ -87,10 +114,24 @@ func getRegions() []Region {
 		"haute_savoie",
 	}
 
+	var IleDeFranceAreas = []string{
+		"paris",
+		"seine_et_marne",
+		"yvelines",
+		"essonne",
+		"hauts_de_seine",
+		"seine_saint_denis",
+		"val_de_marne",
+		"val_d_oise",
+	}
+
 	return []Region{
 		{
 			"rhone_alpes",
 			RhoneAlpesAreas,
+		}, {
+			"ile_de_france",
+			IleDeFranceAreas,
 		},
 	}
 }
@@ -207,45 +248,46 @@ func getRegionAndArea(v string) (string, string, error) {
 }
 
 func initFlags() error {
-	flag.StringVar(&category, "category", getCategories()[DEFAULT_CATEGORY_INDEX], "Categories")
-	flag.StringVar(&region, "region", getRegions()[DEFAULT_REGION_INDEX].Name, "Regions")
-	flag.IntVar(&page, "page", 0, "Page")
-	flag.BoolVar(&parse, "parse", true, "Parse")
+	flag.StringVar(&paramCategory, "category", getCategories()[DEFAULT_CATEGORY_INDEX], "Categories")
+	flag.StringVar(&paramRegion, "region", getRegions()[DEFAULT_REGION_INDEX].Name, "Regions")
+	flag.IntVar(&paramPage, "page", 0, "Page")
+	flag.BoolVar(&paramParse, "parse", true, "Parse")
 
 	flag.Parse()
 
 	// category
-	if categoriesIndexOf(category) == -1 {
-		return fmt.Errorf("Invalid category: '%v'", category)
+	if categoriesIndexOf(paramCategory) == -1 {
+		return fmt.Errorf("Invalid category: '%v'", paramCategory)
 	}
-	log.Printf("category: %v", category)
+	log.Printf("category: %v", paramCategory)
 
 	// region
-	r, a, err := getRegionAndArea(region)
+	r, a, err := getRegionAndArea(paramRegion)
 	if err != nil {
 		return err
 	}
-	region = r
-	area = a
-	log.Printf("region: %v; area: %v", region, area)
+	paramRegion = r
+	paramArea = a
+	log.Printf("region: %v; area: %v", paramRegion, paramArea)
 
 	return nil
 }
 
 func buildUrl() string {
-	url := fmt.Sprintf("%v/%v/offres/", BASE_URL, category)
+	url := fmt.Sprintf("%v/%v/offres/", BASE_URL, paramCategory)
 
-	if area == "" {
-		url += region
+	if paramArea == "" {
+		url += paramRegion
 	} else {
-		url += region + "/" + area
+		url += paramRegion + "/" + paramArea
 	}
 	//url += "/?f=p&th=1&ps=8&pe=9&ms=50000&me=125000"
 	//url += "/?f=p&th=1&ps=8&pe=9"
-	if page <= 1 {
+	//th=1 : enable thumb display
+	if paramPage <= 1 {
 		url += "/?f=p&th=1&ps=8&pe=9"
 	} else {
-		url += fmt.Sprintf("/?o=%v&th=1&ps=8&pe=9", page)
+		url += fmt.Sprintf("/?o=%v&th=1&ps=8&pe=9", paramPage)
 	}
 
 	log.Printf("url: %v", url)
@@ -313,7 +355,7 @@ func parseRequestedHTMLPage(page string) {
 	fmt.Printf("Annonces: %v\n", len(nodes))
 	annnonces := extractAnnoncesData(nodes)
 	for _, ann := range annnonces {
-		fmt.Printf("%v# %v: %v, %v\n", ann.Time, ann.Category, ann.Title, ann.HRef)
+		fmt.Printf("%v# %v: %v, %v, %v\n", ann.Time, ann.Category, ann.Title, ann.LbcId(), ann.HRef)
 	}
 }
 
@@ -382,7 +424,6 @@ func getAnnonceDate(annNode *html.Node) (time.Time, string) {
 			if n.Type == html.TextNode {
 				data := strings.TrimSpace(n.Data)
 				if data != "" {
-
 					date = append(date, data)
 				}
 			}
@@ -415,7 +456,7 @@ func extractAnnoncesData(annNodes []*html.Node) []Annonce {
 
 	for i, annNode := range annNodes {
 		if annNode.Data == "a" {
-			annonces[i].Category = category
+			annonces[i].Category = paramCategory
 			for _, att := range annNode.Attr {
 				switch att.Key {
 				case "href":
@@ -448,7 +489,7 @@ func main() {
 		return
 	}
 
-	if parse {
+	if paramParse {
 		parseRequestedHTMLPage(s)
 	} else {
 		fmt.Printf("%v\n", s)
