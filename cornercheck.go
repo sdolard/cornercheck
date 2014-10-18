@@ -26,13 +26,17 @@ const (
 	LBC_HTML_CHARSET       = "ISO 8859-15"
 )
 
+type AppParams struct {
+	Category string
+	Region   string
+	Area     string
+	Parse    bool
+	Page     int
+}
+
 var (
-	paramCategory string
-	paramRegion   string
-	paramArea     string
-	paramParse    bool
-	paramPage     int
-	re_LbcId      *regexp.Regexp
+	appParam AppParams
+	re_LbcId *regexp.Regexp
 )
 
 func getCategories() []string {
@@ -248,46 +252,46 @@ func getRegionAndArea(v string) (string, string, error) {
 }
 
 func initFlags() error {
-	flag.StringVar(&paramCategory, "category", getCategories()[DEFAULT_CATEGORY_INDEX], "Categories")
-	flag.StringVar(&paramRegion, "region", getRegions()[DEFAULT_REGION_INDEX].Name, "Regions")
-	flag.IntVar(&paramPage, "page", 0, "Page")
-	flag.BoolVar(&paramParse, "parse", true, "Parse")
+	flag.StringVar(&appParam.Category, "category", getCategories()[DEFAULT_CATEGORY_INDEX], "Categories")
+	flag.StringVar(&appParam.Region, "region", getRegions()[DEFAULT_REGION_INDEX].Name, "Regions")
+	flag.IntVar(&appParam.Page, "page", 0, "Page")
+	flag.BoolVar(&appParam.Parse, "parse", true, "Parse")
 
 	flag.Parse()
 
 	// category
-	if categoriesIndexOf(paramCategory) == -1 {
-		return fmt.Errorf("Invalid category: '%v'", paramCategory)
+	if categoriesIndexOf(appParam.Category) == -1 {
+		return fmt.Errorf("Invalid category: '%v'", appParam.Category)
 	}
-	log.Printf("category: %v", paramCategory)
+	log.Printf("category: %v", appParam.Category)
 
 	// region
-	r, a, err := getRegionAndArea(paramRegion)
+	r, a, err := getRegionAndArea(appParam.Region)
 	if err != nil {
 		return err
 	}
-	paramRegion = r
-	paramArea = a
-	log.Printf("region: %v; area: %v", paramRegion, paramArea)
+	appParam.Region = r
+	appParam.Area = a
+	log.Printf("region: %v; area: %v", appParam.Region, appParam.Area)
 
 	return nil
 }
 
 func buildUrl() string {
-	url := fmt.Sprintf("%v/%v/offres/", BASE_URL, paramCategory)
+	url := fmt.Sprintf("%v/%v/offres/", BASE_URL, appParam.Category)
 
-	if paramArea == "" {
-		url += paramRegion
+	if appParam.Area == "" {
+		url += appParam.Region
 	} else {
-		url += paramRegion + "/" + paramArea
+		url += appParam.Region + "/" + appParam.Area
 	}
 	//url += "/?f=p&th=1&ps=8&pe=9&ms=50000&me=125000"
 	//url += "/?f=p&th=1&ps=8&pe=9"
 	//th=1 : enable thumb display
-	if paramPage <= 1 {
+	if appParam.Page <= 1 {
 		url += "/?f=p&th=1&ps=8&pe=9"
 	} else {
-		url += fmt.Sprintf("/?o=%v&th=1&ps=8&pe=9", paramPage)
+		url += fmt.Sprintf("/?o=%v&th=1&ps=8&pe=9", appParam.Page)
 	}
 
 	log.Printf("url: %v", url)
@@ -456,7 +460,7 @@ func extractAnnoncesData(annNodes []*html.Node) []Annonce {
 
 	for i, annNode := range annNodes {
 		if annNode.Data == "a" {
-			annonces[i].Category = paramCategory
+			annonces[i].Category = appParam.Category
 			for _, att := range annNode.Attr {
 				switch att.Key {
 				case "href":
@@ -489,7 +493,7 @@ func main() {
 		return
 	}
 
-	if paramParse {
+	if appParam.Parse {
 		parseRequestedHTMLPage(s)
 	} else {
 		fmt.Printf("%v\n", s)
