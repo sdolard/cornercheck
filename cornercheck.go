@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -32,6 +33,8 @@ type AppParams struct {
 	Region   string
 	Area     string
 	Parse    bool
+	MaxPage  int
+	NumCpu   int
 }
 
 var (
@@ -255,11 +258,15 @@ func initFlags() (AppParams, error) {
 		Category: getCategories()[DEFAULT_CATEGORY_INDEX],
 		Region:   getRegions()[DEFAULT_REGION_INDEX].Name,
 		Parse:    true,
+		MaxPage:  -1,               // no limits,
+		NumCpu:   runtime.NumCPU(), // logical CPUs on the local machine
 	}
 
-	flag.StringVar(&appParams.Category, "category", appParams.Category, "Categories")
-	flag.StringVar(&appParams.Region, "region", appParams.Region, "Regions")
-	flag.BoolVar(&appParams.Parse, "parse", appParams.Parse, "Parse")
+	flag.StringVar(&appParams.Category, "category", appParams.Category, "Categories: todo")
+	flag.StringVar(&appParams.Region, "region", appParams.Region, "Regions: todo")
+	flag.BoolVar(&appParams.Parse, "parse", appParams.Parse, "Parse: todo")
+	flag.IntVar(&appParams.MaxPage, "maxpage", appParams.MaxPage, "MaxPage: todo")
+	flag.IntVar(&appParams.NumCpu, "numcpu", appParams.NumCpu, "NumCpu: todo")
 
 	flag.Parse()
 
@@ -277,6 +284,11 @@ func initFlags() (AppParams, error) {
 	appParams.Region = r
 	appParams.Area = a
 	log.Printf("region: %v; area: %v", appParams.Region, appParams.Area)
+
+	// NumCpu
+	if appParams.NumCpu < 1 {
+		appParams.NumCpu = 1
+	}
 
 	return appParams, nil
 }
@@ -493,19 +505,31 @@ func main() {
 	}
 
 	httpClient := initHttpClient()
+
 	page := 0
+	cAnnoncesCount := make(chan int)
+	quit := false
 	for {
-		s, err := request(httpClient, buildUrl(appParams, page))
-		if err != nil {
-			log.Printf("Error running request: %v", err)
-			return
+		for i := 0; i < appParams.NumCpu; i++ {
+			go func(page int) {
+				s, err := request(httpClient, buildUrl(appParams, page))
+				if err != nil {
+					log.Printf("Error running request: %v", err)
+					return
+				}
+
+				cAnnoncesCount <- parseRequestedHTMLPage(s, appParams.Category)
+			}(page)
+			page++
 		}
 
-		annoncesCount := parseRequestedHTMLPage(s, appParams.Category)
-		if annoncesCount == 0 {
+		for i := 0; i < appParams.NumCpu; i++ {
+			if <-cAnnoncesCount == 0 && !quit {
+				quit = true
+			}
+		}
+		if quit {
 			break
 		}
-		page++
 	}
-
 }
