@@ -58,11 +58,14 @@ func getCategories() []string {
 }
 
 type Annonce struct {
-	HRef       string
-	Title      string
-	Time       time.Time
-	TimeString string
-	Category   string
+	HRef        string
+	Title       string
+	Time        time.Time
+	TimeString  string
+	Category    string
+	MaxPrice    int
+	MinPrice    int
+	PriceString string
 }
 
 func (a Annonce) LbcId() string {
@@ -375,7 +378,7 @@ func parseRequestedHTMLPage(page string, category string) int {
 	fmt.Printf("Annonces: %v\n", len(nodes))
 	annnonces := extractAnnoncesData(nodes, category)
 	for _, ann := range annnonces {
-		fmt.Printf("%v# %v: %v, %v, %v\n", ann.Time.Format(TIME_LAYOUT), ann.Category, ann.Title, ann.LbcId(), ann.HRef)
+		fmt.Printf("%v# %v: %v, %v-%v (%v), %v, %v\n", ann.Time.Format(TIME_LAYOUT), ann.Category, ann.Title, ann.MinPrice, ann.MaxPrice, ann.PriceString, ann.LbcId(), ann.HRef)
 	}
 	return len(nodes)
 }
@@ -472,6 +475,68 @@ func getAnnonceDate(annNode *html.Node) (time.Time, string) {
 	return lbcDateToTime(date[0], date[1])
 }
 
+func lbcPriceToInt(price string) (int, int) {
+	p := strings.Replace(price, " ", "", -1)
+	p = strings.Replace(p, "€", "", -1)
+	p = strings.Replace(p, "\u00a0", "", -1)
+	if p == "" {
+		return 0, 0
+	}
+	if strings.Contains(p, "-") {
+		prices := strings.Split(p, "-")
+		if len(prices) != 2 {
+			panic(fmt.Sprintf("Invalid price format: '%v'", p))
+		}
+		MinPrice64, err := strconv.ParseInt(prices[0], 10, 0)
+		if err != nil {
+			panic(fmt.Sprintf("Min price: '%v'; %v", prices[0], err))
+		}
+		MaxPrice64, err := strconv.ParseInt(prices[1], 10, 0)
+		if err != nil {
+			panic(fmt.Sprintf("Max price: '%v'; %v", prices[1], err))
+		}
+		return int(MinPrice64), int(MaxPrice64)
+	} else {
+		price64, err := strconv.ParseInt(p, 10, 0)
+		if err != nil {
+			panic(fmt.Sprintf("price: '%v'; %v", price, err))
+		}
+		return int(price64), int(price64)
+	}
+}
+
+func getAnnoncePrice(annNode *html.Node) (int, int, string) {
+	price := ""
+	collect := false
+	var f func(*html.Node)
+	f = func(n *html.Node) {
+		if collect {
+			if n.Type == html.TextNode {
+				price = strings.TrimSpace(n.Data)
+				return
+			}
+		} else {
+			if n.Type == html.ElementNode && n.Data == "div" {
+				for _, a := range n.Attr {
+					if a.Key == "class" && a.Val == "price" {
+						collect = true
+					}
+				}
+			}
+		}
+
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			f(c)
+			if price != "" {
+				break
+			}
+		}
+	}
+	f(annNode)
+	min, max := lbcPriceToInt(price)
+	return min, max, price
+}
+
 func extractAnnoncesData(annNodes []*html.Node, category string) []Annonce {
 	annonces := make([]Annonce, len(annNodes))
 
@@ -488,6 +553,8 @@ func extractAnnoncesData(annNodes []*html.Node, category string) []Annonce {
 			}
 
 			annonces[i].Time, annonces[i].TimeString = getAnnonceDate(annNodes[i])
+			annonces[i].MinPrice, annonces[i].MaxPrice, annonces[i].PriceString = getAnnoncePrice(annNodes[i])
+
 		} else {
 			panic("format change")
 		}
