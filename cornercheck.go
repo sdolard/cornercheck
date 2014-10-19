@@ -1,11 +1,11 @@
 package main
 
 import (
-	"./annonce"
 	"code.google.com/p/go.net/html"
 	"code.google.com/p/go.net/html/charset"
 	"flag"
 	"fmt"
+	"github.com/sdolard/cornercheck/annonce"
 	"io/ioutil"
 	"log"
 	"net/http"

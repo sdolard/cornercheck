@@ -1,8 +1,8 @@
 package annonce
 
 import (
-	"code.google.com/p/go.net/html"
 	"fmt"
+	"gopkg.in/mgo.v2"
 	"log"
 	"net/url"
 	"regexp"
