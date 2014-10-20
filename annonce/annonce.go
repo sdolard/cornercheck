@@ -34,7 +34,9 @@ func getLbcShortMonths() map[string]time.Month {
 }
 
 var (
-	re_LbcId *regexp.Regexp
+	re_LbcId        *regexp.Regexp
+	re_LbcPlacement *regexp.Regexp
+	re_LbcPrice     *regexp.Regexp
 )
 
 type Annonce struct {
@@ -107,9 +109,10 @@ func lbcDateToTime(dayS, hourS string) (time.Time, string) {
 }
 
 func lbcPriceToInt(price string) (int, int) {
-	p := strings.Replace(price, " ", "", -1)
-	p = strings.Replace(p, "€", "", -1)
-	p = strings.Replace(p, "\u00a0", "", -1)
+	if re_LbcPrice == nil {
+		re_LbcPrice = regexp.MustCompile("[ €\u00a0]")
+	}
+	p := re_LbcPrice.ReplaceAllLiteralString(price, "")
 	if p == "" {
 		return 0, 0
 	}
@@ -164,10 +167,13 @@ func getAnnoncePlacement(annNode *html.Node) (string, string, string) {
 		}
 	}
 	f(annNode)
+
+	if re_LbcPlacement == nil {
+		re_LbcPlacement = regexp.MustCompile("[\r\n\t\\s]")
+	}
+	placement = re_LbcPlacement.ReplaceAllLiteralString(placement, "")
 	if strings.Contains(placement, "/") {
 		places := strings.Split(placement, "/")
-		log.Printf("placement: '%v'", placement)
-		log.Printf("places len: '%v' (%v, %v)", len(places), places[0], places[1])
 		return strings.TrimSpace(places[0]), strings.TrimSpace(places[1]), placement
 	} else {
 		return "", placement, placement
