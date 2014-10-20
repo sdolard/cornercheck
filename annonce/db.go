@@ -1,24 +1,24 @@
 package annonce
 
-import (
-	"gopkg.in/mgo.v2"
-)
+// import (
+// 	"gopkg.in/mgo.v2"
+// )
 
-var (
-	session *Session
-)
+// var (
+// 	session *Session
+// )
 
 const (
-	url = "mongodb://localhost"
+	MONGODB_URL = "mongodb://localhost"
 )
 
-func Session() *Session {
-	if session == nil {
-		s, err = mgo.Dial(url)
-		if err {
-			panic(err)
-		}
-		session = s
-	}
-	return s
-}
+// func Session() *Session {
+// 	if session == nil {
+// 		s, err = mgo.Dial(url)
+// 		if err {
+// 			panic(err)
+// 		}
+// 		session = s
+// 	}
+// 	return s
+// }

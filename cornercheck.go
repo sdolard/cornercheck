@@ -3,6 +3,7 @@ package main
 import (
 	"code.google.com/p/go.net/html"
 	"code.google.com/p/go.net/html/charset"
+	"errors"
 	"flag"
 	"fmt"
 	"github.com/sdolard/cornercheck/annonce"
@@ -170,6 +171,9 @@ func request(c *http.Client, u string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if resp.StatusCode == http.StatusProxyAuthRequired {
+		return "", errors.New(resp.Status)
+	}
 	return string(body), nil
 }
 
@@ -326,7 +330,16 @@ func parseRequestedHTMLPage(page string, category string) int {
 	fmt.Printf("Annonces: %v\n", len(nodes))
 	annnonces := annonce.ExtractAnnoncesData(nodes, category)
 	for _, ann := range annnonces {
-		fmt.Printf("%v# %v: %v, %v-%v (%v), %v, %v\n", ann.Time.Format(TIME_LAYOUT), ann.Category, ann.Title, ann.MinPrice, ann.MaxPrice, ann.PriceString, ann.LbcId(), ann.HRef)
+		fmt.Printf("%v# %v: %v, %v-%v (%v), %v, %v, %v\n",
+			ann.Time.Format(TIME_LAYOUT),
+			ann.Category,
+			ann.Title,
+			ann.MinPrice,
+			ann.MaxPrice,
+			ann.PriceString,
+			ann.PlacementString,
+			ann.LbcId(),
+			ann.HRef)
 	}
 	return len(nodes)
 }

@@ -1,8 +1,8 @@
 package annonce
 
 import (
+	"code.google.com/p/go.net/html"
 	"fmt"
-	"gopkg.in/mgo.v2"
 	"log"
 	"net/url"
 	"regexp"
@@ -38,14 +38,17 @@ var (
 )
 
 type Annonce struct {
-	HRef        string
-	Title       string
-	Time        time.Time
-	TimeString  string
-	Category    string
-	MaxPrice    int
-	MinPrice    int
-	PriceString string
+	HRef            string
+	Title           string
+	Time            time.Time
+	TimeString      string
+	Category        string
+	MaxPrice        int
+	MinPrice        int
+	PriceString     string
+	Town            string
+	Area            string
+	PlacementString string
 }
 
 func lbcDateToTime(dayS, hourS string) (time.Time, string) {
@@ -130,6 +133,44 @@ func lbcPriceToInt(price string) (int, int) {
 			panic(fmt.Sprintf("price: '%v'; %v", price, err))
 		}
 		return int(price64), int(price64)
+	}
+}
+
+func getAnnoncePlacement(annNode *html.Node) (string, string, string) {
+	placement := ""
+	collect := false
+	var f func(*html.Node)
+	f = func(n *html.Node) {
+		if collect {
+			if n.Type == html.TextNode {
+				placement = strings.TrimSpace(n.Data)
+				return
+			}
+		} else {
+			if n.Type == html.ElementNode && n.Data == "div" {
+				for _, a := range n.Attr {
+					if a.Key == "class" && a.Val == "placement" {
+						collect = true
+					}
+				}
+			}
+		}
+
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			f(c)
+			if placement != "" {
+				break
+			}
+		}
+	}
+	f(annNode)
+	if strings.Contains(placement, "/") {
+		places := strings.Split(placement, "/")
+		log.Printf("placement: '%v'", placement)
+		log.Printf("places len: '%v' (%v, %v)", len(places), places[0], places[1])
+		return strings.TrimSpace(places[0]), strings.TrimSpace(places[1]), placement
+	} else {
+		return "", placement, placement
 	}
 }
 
@@ -235,6 +276,7 @@ func ExtractAnnoncesData(annNodes []*html.Node, category string) []Annonce {
 
 			annonces[i].Time, annonces[i].TimeString = getAnnonceDate(annNodes[i])
 			annonces[i].MinPrice, annonces[i].MaxPrice, annonces[i].PriceString = getAnnoncePrice(annNodes[i])
+			annonces[i].Town, annonces[i].Area, annonces[i].PlacementString = getAnnoncePlacement(annNodes[i])
 
 		} else {
 			panic("format change")
