@@ -1,3 +1,4 @@
+// Package cornercheck collect le bon coin data
 package main
 
 import (
@@ -29,8 +30,6 @@ type AppParams struct {
 	Category string
 	Region   string
 	Area     string
-	Parse    bool
-	MaxPage  int
 	NumCpu   int
 }
 
@@ -72,6 +71,7 @@ func getRegions() []Region {
 		"haute_savoie",
 	}
 
+	//http://www.insee.fr/fr/methodes/nomenclatures/cog/telechargement.asp
 	var IleDeFranceAreas = []string{
 		"paris",
 		"seine_et_marne",
@@ -92,6 +92,24 @@ func getRegions() []Region {
 			IleDeFranceAreas,
 		},
 	}
+}
+
+func RegionsToHelpString() string {
+	s := ""
+
+	for _, r := range getRegions() {
+		s += "\r\n\t"
+		s = s + r.Name + ": "
+		a := ""
+		for _, area := range r.Areas {
+			if a != "" {
+				a += ", "
+			}
+			a += area
+		}
+		s += a
+	}
+	return s
 }
 
 // GET /voitures/offres/rhone_alpes/rhone/?f=p&th=1&ps=8&pe=9&ms=50000&me=125000 HTTP/1.1
@@ -212,16 +230,12 @@ func initFlags() (AppParams, error) {
 	appParams := AppParams{
 		Category: getCategories()[DEFAULT_CATEGORY_INDEX],
 		Region:   getRegions()[DEFAULT_REGION_INDEX].Name,
-		Parse:    true,
-		MaxPage:  -1,               // no limits,
 		NumCpu:   runtime.NumCPU(), // logical CPUs on the local machine
 	}
 
-	flag.StringVar(&appParams.Category, "category", appParams.Category, "Categories: todo")
-	flag.StringVar(&appParams.Region, "region", appParams.Region, "Regions: todo")
-	flag.BoolVar(&appParams.Parse, "parse", appParams.Parse, "Parse: todo")
-	flag.IntVar(&appParams.MaxPage, "maxpage", appParams.MaxPage, "MaxPage: todo")
-	flag.IntVar(&appParams.NumCpu, "numcpu", appParams.NumCpu, "NumCpu: todo")
+	flag.StringVar(&appParams.Category, "category", appParams.Category, "\r\n\tValues: "+strings.Join(getCategories(), ", "))
+	flag.StringVar(&appParams.Region, "region", appParams.Region, RegionsToHelpString())
+	flag.IntVar(&appParams.NumCpu, "numcpu", appParams.NumCpu, "Used cpu")
 
 	flag.Parse()
 
@@ -265,7 +279,7 @@ func buildUrl(appParams AppParams, page int) string {
 		url += fmt.Sprintf("/?o=%v&th=1&ps=8&pe=9", page)
 	}
 
-	log.Printf("url: %v", url)
+	//log.Printf("url: %v", url)
 	return url
 }
 
@@ -344,6 +358,7 @@ func parseRequestedHTMLPage(page string, category string) int {
 	return len(nodes)
 }
 
+// What if...
 func main() {
 	appParams, err := initFlags()
 	if err != nil {
