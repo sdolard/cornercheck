@@ -21,8 +21,7 @@ import (
 
 const (
 	BASE_URL               = "http://www.leboncoin.fr"
-	DEFAULT_CATEGORY_INDEX = 0 // alsace
-	DEFAULT_REGION_INDEX   = 0 // bas_rhin
+	DEFAULT_CATEGORY_INDEX = 0 // _vehicules_
 	LBC_HTML_CHARSET       = "ISO 8859-15"
 	TIME_LAYOUT            = "02 Jan 06 15:04"
 )
@@ -157,7 +156,7 @@ func categoriesIndexOf(v string) int {
 func initFlags() (AppParams, error) {
 	appParams := AppParams{
 		Category: getCategories()[DEFAULT_CATEGORY_INDEX],
-		Region:   regions.Get()[DEFAULT_REGION_INDEX].Name,
+		Region:   regions.DEFAULT_REGION,
 		NumCpu:   runtime.NumCPU(), // logical CPUs on the local machine
 	}
 

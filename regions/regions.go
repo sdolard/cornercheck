@@ -9,6 +9,10 @@ type Region struct {
 	Areas []string
 }
 
+const (
+	DEFAULT_REGION = "rhone"
+)
+
 // Returns regions and there areas
 func Get() []Region {
 	//http://www.insee.fr/fr/methodes/nomenclatures/cog/telechargement.asp
