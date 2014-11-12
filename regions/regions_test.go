@@ -1,7 +1,9 @@
 package regions
 
 import (
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 )
@@ -52,7 +54,7 @@ func TestGetRegionAndArea(t *testing.T) {
 
 	for _, wanted := range wants {
 		if region, _, _ := GetRegionAndArea(wanted.regionOrArea); region != wanted.region {
-			t.Errorf("TestGetRegionAndArea() = '%v', want '%v'", region, wanted.region)
+			t.Errorf("TestGetRegionAndArea() = '%v', want '%v' (%v)", region, wanted.region, wanted.regionOrArea)
 		}
 	}
 
@@ -60,5 +62,39 @@ func TestGetRegionAndArea(t *testing.T) {
 	errMessage := fmt.Sprintf("Invalid region: '%v'", invalidRegion)
 	if _, _, err := GetRegionAndArea(invalidRegion); err.Error() != errMessage {
 		t.Errorf("TestGetRegionAndArea() = %v, want an error: %v", err.Error(), errMessage)
+	}
+}
+
+func TestGet(t *testing.T) {
+	c := http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return errors.New("Don't want redirect")
+		},
+	}
+	const (
+		URL = "http://www.leboncoin.fr/annonces/offres/"
+	)
+	count := 0
+	cCount := make(chan int)
+	test := func(url string) {
+		res, err := c.Get(fmt.Sprintf(url))
+		if res.StatusCode == 301 || err != nil {
+			t.Errorf("TestGet() code = %v, want 200, url %v, err %v", res.StatusCode, url, err)
+		}
+		count--
+		cCount <- 0
+	}
+	for _, region := range Get() {
+		count++
+		go test(fmt.Sprintf("%v%v/", URL, region.Name))
+		for _, area := range region.Areas {
+			count++
+			go test(fmt.Sprintf("%v%v/%v/", URL, region.Name, area))
+		}
+	}
+	for {
+		if <-cCount; count == 0 {
+			break
+		}
 	}
 }

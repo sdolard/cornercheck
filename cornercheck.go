@@ -285,7 +285,6 @@ func parseRequestedHTMLPage(page string, category string) int {
 	return len(nodes)
 }
 
-// What if...
 func main() {
 	appParams, err := initFlags()
 	if err != nil {
