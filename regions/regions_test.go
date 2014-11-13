@@ -74,27 +74,28 @@ func TestGet(t *testing.T) {
 	const (
 		URL = "http://www.leboncoin.fr/annonces/offres/"
 	)
-	count := 0
-	cCount := make(chan int)
+	var urlToTest []string
+	cCount := make(chan string)
 	test := func(url string) {
 		res, err := c.Get(fmt.Sprintf(url))
 		if res.StatusCode == 301 || err != nil {
 			t.Errorf("TestGet() code = %v, want 200, url %v, err %v", res.StatusCode, url, err)
 		}
-		count--
-		cCount <- 0
+		cCount <- url
 	}
+
 	for _, region := range Get() {
-		count++
-		go test(fmt.Sprintf("%v%v/", URL, region.Name))
+		urlToTest = append(urlToTest, fmt.Sprintf("%v%v/", URL, region.Name))
 		for _, area := range region.Areas {
-			count++
-			go test(fmt.Sprintf("%v%v/%v/", URL, region.Name, area))
+			urlToTest = append(urlToTest, fmt.Sprintf("%v%v/%v/", URL, region.Name, area))
 		}
 	}
-	for {
-		if <-cCount; count == 0 {
-			break
-		}
+
+	for _, url := range urlToTest {
+		go test(url)
+	}
+
+	for i := 0; i < len(urlToTest); i++ {
+		<-cCount
 	}
 }
