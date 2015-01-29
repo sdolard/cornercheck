@@ -29,7 +29,7 @@ func getLbcShortMonths() map[string]time.Month {
 		"sept": time.September,
 		"oct":  time.October,
 		"nov":  time.November,
-		"dec":  time.December,
+		"déc":  time.December,
 	}
 }
 
