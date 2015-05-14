@@ -2,13 +2,11 @@
 package main
 
 import (
-	"code.google.com/p/go.net/html"
-	"code.google.com/p/go.net/html/charset"
+	"cornercheck/annonce"
+	"cornercheck/regions"
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/sdolard/cornercheck/annonce"
-	"github.com/sdolard/cornercheck/regions"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -17,6 +15,9 @@ import (
 	"os"
 	"runtime"
 	"strings"
+
+	"golang.org/x/net/html"
+	"golang.org/x/net/html/charset"
 )
 
 const (
@@ -235,28 +236,27 @@ func getListRootNode(root *html.Node) *html.Node {
 	return list
 }
 
-func getAnnonceNodes(listRoot *html.Node) []*html.Node {
+func getAnnonceNodes(listRoot *html.Node, url string) []*html.Node {
 	var nodes []*html.Node
 	for c := listRoot.FirstChild; c != nil; c = c.NextSibling {
 		if c.Type == html.ElementNode {
-
 			if c.Data == "a" {
 				nodes = append(nodes, c)
 			} else if c.Data == "div" {
 				for _, a := range c.Attr {
-					if a.Key != "class" && a.Val != "clear" {
-						panic(fmt.Sprintf("Unexpected annonces root node (format change ? Key = %v, Val=)", a.Key, a.Val))
+					if !strings.Contains("classid", a.Key) && !strings.Contains("clearoas-x", a.Val) {
+						panic(fmt.Sprintf("Unexpected annonces root node (format change ? Key='%v', Val='%v', Url='%v')", a.Key, a.Val, url))
 					}
 				}
 			} else {
-				panic(fmt.Sprintf("Unexpected annonces root node (format change ?, Data: %v)", c.Data))
+				panic(fmt.Sprintf("Unexpected annonces root node (format change ? Data='%v', Url='%v')", c.Data, url))
 			}
 		}
 	}
 	return nodes
 }
 
-func parseRequestedHTMLPage(page string, category string) int {
+func parseRequestedHTMLPage(page string, category string, url string) int {
 	doc, err := html.Parse(strings.NewReader(page))
 	if err != nil {
 		log.Fatal(err)
@@ -267,7 +267,7 @@ func parseRequestedHTMLPage(page string, category string) int {
 		return 0
 	}
 
-	nodes := getAnnonceNodes(listRootNode)
+	nodes := getAnnonceNodes(listRootNode, url)
 	fmt.Printf("Annonces: %v\n", len(nodes))
 	annnonces := annonce.ExtractAnnoncesData(nodes, category)
 	for _, ann := range annnonces {
@@ -301,13 +301,14 @@ func main() {
 	for {
 		for i := 0; i < appParams.NumCpu; i++ {
 			go func(page int, done chan int) {
-				s, err := request(httpClient, buildUrl(appParams, page))
+				url := buildUrl(appParams, page)
+				s, err := request(httpClient, url)
 				if err != nil {
 					log.Printf("Error running request: %v", err)
 					return
 				}
 
-				done <- parseRequestedHTMLPage(s, appParams.Category)
+				done <- parseRequestedHTMLPage(s, appParams.Category, url)
 			}(page, cAnnoncesCount)
 			page++
 		}

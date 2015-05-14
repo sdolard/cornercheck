@@ -1,7 +1,6 @@
 package annonce
 
 import (
-	"code.google.com/p/go.net/html"
 	"fmt"
 	"log"
 	"net/url"
@@ -9,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/net/html"
 )
 
 const (
