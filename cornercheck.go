@@ -11,7 +11,6 @@ import (
 	"log"
 	"net/http"
 	"net/http/cookiejar"
-	"net/url"
 	"os"
 	"runtime"
 	"strings"
@@ -21,17 +20,17 @@ import (
 )
 
 const (
-	BASE_URL               = "http://www.leboncoin.fr"
-	DEFAULT_CATEGORY_INDEX = 0 // _vehicules_
-	LBC_HTML_CHARSET       = "ISO 8859-15"
-	TIME_LAYOUT            = "02 Jan 06 15:04"
+	baseURL              = "http://www.leboncoin.fr"
+	defaultCategoryIndex = 0 // _vehicules_
+	lbcHTMLCharset       = "ISO 8859-15"
+	timeLayout           = "02 Jan 06 15:04"
 )
 
-type AppParams struct {
+type appParams struct {
 	Category string
 	Region   string
 	Area     string
-	NumCpu   int
+	NumCPU   int
 }
 
 func getCategories() []string {
@@ -50,81 +49,13 @@ func getCategories() []string {
 	}
 }
 
-type LbcDate struct {
-	Day  string
-	Hour string
-}
-
-// GET /voitures/offres/rhone_alpes/rhone/?f=p&th=1&ps=8&pe=9&ms=50000&me=125000 HTTP/1.1
-// Host: www.leboncoin.fr
-// Connection: keep-alive
-// Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
-// User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.101 Safari/537.36
-// Referer: http://www.leboncoin.fr/voitures/offres/rhone_alpes/ain/?f=p&th=1&ps=8&pe=9&ms=50000&me=125000
-// Accept-Encoding: gzip,deflate,sdch
-// Accept-Language: fr-FR,fr;q=0.8,en-US;q=0.6,en;q=0.4
-// Cookie: xtvrn=$266818$;
-//  OAX=Wh1ajFQmtwAADbeR;
-//  location_search_22_1_toutes_les_communes_01600=Toutes%20les%20communes%2001600:3;
-//  location_search_22_1_toutes_les_communes_69480=Toutes%20les%20communes%2069480:1;
-//  sli=1;
-//  lazyLoadCounterAppear=39;
-//  weboForOas={"weboQueryDate":"2014-10-09-09-38","weboCalls":2,"clusters":"","audiences":"","social_demo":"","oasCalls":1};
-//  RMFD=011Xc8J2O205fc!O107aY!O307aZ!O108WN!S208ZY!B508fi;
-//  layout=0;
-//  s=red1x490e57f2ad31c85f5fc275aa0354d81abdde2062;
-//  sq=ca=22_s&w=101&c=2&f=p&th=1&ps=8&pe=9&ms=50000&me=125000;
-//  cookieFrame=2;
-//  is_new_search=1
-
-// GET /voitures/offres/rhone_alpes/ain/?f=p&th=1&ps=8&pe=9&ms=50000&me=125000 HTTP/1.1
-// Host: www.leboncoin.fr
-// Connection: keep-alive
-// Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
-// User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.101 Safari/537.36
-// Referer: http://www.leboncoin.fr/voitures/offres/rhone_alpes/rhone/?f=p&th=1&ps=8&pe=9&ms=50000&me=125000
-// Accept-Encoding: gzip,deflate,sdch
-// Accept-Language: fr-FR,fr;q=0.8,en-US;q=0.6,en;q=0.4
-// Cookie: xtvrn=$266818$;
-//  OAX=Wh1ajFQmtwAADbeR;
-//  location_search_22_1_toutes_les_communes_01600=Toutes%20les%20communes%2001600:3;
-//  location_search_22_1_toutes_les_communes_69480=Toutes%20les%20communes%2069480:1;
-//  sli=1;
-//  lazyLoadCounterAppear=39;
-//  weboForOas={"weboQueryDate":"2014-10-09-09-38","weboCalls":2,"clusters":"","audiences":"","social_demo":"","oasCalls":1};
-//  RMFD=011Xc8J2O205fc!O107aY!O307aZ!O108WN!S208ZY!B508fi;
-//  layout=0;
-//  sq=ca=22_s&w=169&c=2&f=p&th=1&ps=8&pe=9&ms=50000&me=125000;
-//  cookieFrame=2;
-//  s=red1x490e57f2ad31c85f5fc275aa0354d81abdde2062;
-//  is_new_search=1
-
-func addCookies(c *http.Client, u string) error {
-	parsedUrl, err := url.Parse(u)
-	if err != nil {
-		log.Printf("error parsing string: %v", u)
-		return err
-	}
-	cookies := []*http.Cookie{
-		{Name: "sq", Value: "ca=22_s&w=101&c=2&f=p&th=1&ps=8&pe=9&ms=50000&me=125000", Path: "/", Domain: ".leboncoin.fr"},
-	}
-
-	c.Jar.SetCookies(parsedUrl, cookies)
-	return nil
-}
-
 func request(c *http.Client, u string) (string, error) {
-	//err := addCookies(c, u)
-	// if err != nil {
-	// 	return "", err
-	// }
-
 	resp, err := c.Get(u)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
-	reader, err := charset.NewReader(resp.Body, LBC_HTML_CHARSET)
+	reader, err := charset.NewReader(resp.Body, lbcHTMLCharset)
 	if err != nil {
 		return "", err
 	}
@@ -138,7 +69,7 @@ func request(c *http.Client, u string) (string, error) {
 	return string(body), nil
 }
 
-func initHttpClient() *http.Client {
+func initHTTPClient() *http.Client {
 	cookieJar, _ := cookiejar.New(nil)
 	return &http.Client{
 		Jar: cookieJar,
@@ -154,59 +85,60 @@ func categoriesIndexOf(v string) int {
 	return -1
 }
 
-func initFlags() (AppParams, error) {
-	appParams := AppParams{
-		Category: getCategories()[DEFAULT_CATEGORY_INDEX],
-		Region:   regions.DEFAULT_REGION,
-		NumCpu:   runtime.NumCPU(), // logical CPUs on the local machine
+func initFlags() (appParams, error) {
+	params := appParams{
+		Category: getCategories()[defaultCategoryIndex],
+		Region:   regions.DefaultRegion,
+		NumCPU:   runtime.NumCPU(), // logical CPUs on the local machine
 	}
 
-	flag.StringVar(&appParams.Category, "category", appParams.Category, "\r\n\tValues: "+strings.Join(getCategories(), ", "))
-	flag.StringVar(&appParams.Region, "region", appParams.Region, regions.ToHelpString())
-	flag.IntVar(&appParams.NumCpu, "numcpu", appParams.NumCpu, "Used cpu")
+	flag.StringVar(&params.Category, "category", params.Category, "\r\n\tValues: "+strings.Join(getCategories(), ", "))
+	flag.StringVar(&params.Region, "region", params.Region, regions.ToHelpString())
+	flag.IntVar(&params.NumCPU, "numcpu", params.NumCPU, "Used cpu")
 
 	flag.Parse()
 
 	// category
-	if categoriesIndexOf(appParams.Category) == -1 {
-		return appParams, fmt.Errorf("Invalid category: '%v'", appParams.Category)
+	if categoriesIndexOf(params.Category) == -1 {
+		return params, fmt.Errorf("Invalid category: '%v'", params.Category)
 	}
-	log.Printf("category: %v", appParams.Category)
+	log.Printf("category: %v", params.Category)
 
 	// region
-	r, a, err := regions.GetRegionAndArea(appParams.Region)
+	r, a, err := regions.GetRegionAndArea(params.Region)
 	if err != nil {
-		return appParams, err
+		return params, err
 	}
-	appParams.Region = r
-	appParams.Area = a
-	log.Printf("region: %v; area: %v", appParams.Region, appParams.Area)
+	params.Region = r
+	params.Area = a
+	log.Printf("region: %v; area: %v", params.Region, params.Area)
 
-	// NumCpu
-	if appParams.NumCpu < 1 {
-		appParams.NumCpu = 1
+	// NumCPU
+	if params.NumCPU < 1 {
+		params.NumCPU = 1
 	}
 
-	return appParams, nil
+	return params, nil
 }
 
-func buildUrl(appParams AppParams, page int) string {
-	url := fmt.Sprintf("%v/%v/offres/", BASE_URL, appParams.Category)
+func buildURL(params appParams, page int) string {
+	url := fmt.Sprintf("%v/%v/offres/", baseURL, params.Category)
 
-	if appParams.Area == "" {
-		url += appParams.Region
+	if params.Area == "" {
+		url += params.Region
 	} else {
-		url += appParams.Region + "/" + appParams.Area
+		url += params.Region + "/" + params.Area
 	}
-	//url += "/?f=p&th=1&ps=8&pe=9&ms=50000&me=125000"
-	//url += "/?f=p&th=1&ps=8&pe=9"
-	//th=1 : enable thumb display
-	if page <= 1 {
-		url += "/?f=p&th=1&ps=8&pe=9"
-	} else {
-		url += fmt.Sprintf("/?o=%v&th=1&ps=8&pe=9", page)
+	url += "/?"
+	// th=1 : enable thumb display
+	url += "th=0"
+	// it=1 : search only in title
+	url += "&it=0"
+	// o=   : page number
+	if page > 1 {
+		url += fmt.Sprintf("&o=%v", page)
 	}
-
+	// q=   : query. TODO ?
 	//log.Printf("url: %v", url)
 	return url
 }
@@ -272,14 +204,14 @@ func parseRequestedHTMLPage(page string, category string, url string) int {
 	annnonces := annonce.ExtractAnnoncesData(nodes, category)
 	for _, ann := range annnonces {
 		fmt.Printf("%v# %v: %v, %v-%v (%v), %v, %v, %v\n",
-			ann.Time.Format(TIME_LAYOUT),
+			ann.Time.Format(timeLayout),
 			ann.Category,
 			ann.Title,
 			ann.MinPrice,
 			ann.MaxPrice,
 			ann.PriceString,
 			ann.PlacementString,
-			ann.LbcId(),
+			ann.LbcID(),
 			ann.HRef)
 	}
 	return len(nodes)
@@ -293,15 +225,15 @@ func main() {
 		return
 	}
 
-	httpClient := initHttpClient()
+	httpClient := initHTTPClient()
 
 	page := 0
 	cAnnoncesCount := make(chan int)
 	quit := false
 	for {
-		for i := 0; i < appParams.NumCpu; i++ {
+		for i := 0; i < appParams.NumCPU; i++ {
 			go func(page int, done chan int) {
-				url := buildUrl(appParams, page)
+				url := buildURL(appParams, page)
 				s, err := request(httpClient, url)
 				if err != nil {
 					log.Printf("Error running request: %v", err)
@@ -313,7 +245,7 @@ func main() {
 			page++
 		}
 
-		for i := 0; i < appParams.NumCpu; i++ {
+		for i := 0; i < appParams.NumCPU; i++ {
 			if <-cAnnoncesCount == 0 && !quit {
 				quit = true
 			}

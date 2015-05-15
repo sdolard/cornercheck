@@ -13,15 +13,15 @@ import (
 )
 
 const (
-	DATE_YESTERDAY = "Hier"
-	DATE_TODAY     = "Aujourd'hui"
+	dateYesterday = "Hier"
+	dateToday     = "Aujourd'hui"
 )
 
 func getLbcShortMonths() map[string]time.Month {
 	return map[string]time.Month{
 		"jan":  time.January,
 		"fev":  time.February,
-		"mar":  time.March,
+		"mars": time.March,
 		"avr":  time.April,
 		"mai":  time.May,
 		"juin": time.June,
@@ -35,11 +35,12 @@ func getLbcShortMonths() map[string]time.Month {
 }
 
 var (
-	re_LbcId        *regexp.Regexp
-	re_LbcPlacement *regexp.Regexp
-	re_LbcPrice     *regexp.Regexp
+	reLbcID        *regexp.Regexp
+	reLbcPlacement *regexp.Regexp
+	reLbcPrice     *regexp.Regexp
 )
 
+// Annonce struct
 type Annonce struct {
 	HRef            string
 	Title           string
@@ -74,13 +75,13 @@ func lbcDateToTime(dayS, hourS string) (time.Time, string) {
 	min := int(min64)
 
 	// Day
-	if dayS == DATE_YESTERDAY {
+	if dayS == dateYesterday {
 		// Hier 13:52
 		d := now.AddDate(0, 0, -1)
 		year = d.Year()
 		month = d.Month()
 		day = d.Day()
-	} else if dayS == DATE_TODAY {
+	} else if dayS == dateToday {
 		// Aujourd'hui 13:52
 		// Initialized data are valid for this case
 	} else {
@@ -93,7 +94,7 @@ func lbcDateToTime(dayS, hourS string) (time.Time, string) {
 		day = int(day64)
 		month = getLbcShortMonths()[decomposedDay[1]]
 		if month == 0 {
-			panic(fmt.Sprintf("Invalid month: %v", decomposedDay[1]))
+			panic(fmt.Sprintf("Invalid month: %v. dayS: %v; hourS: %v", decomposedDay[1], dayS, hourS))
 		}
 	}
 
@@ -110,10 +111,10 @@ func lbcDateToTime(dayS, hourS string) (time.Time, string) {
 }
 
 func lbcPriceToInt(price string) (int, int) {
-	if re_LbcPrice == nil {
-		re_LbcPrice = regexp.MustCompile("[ €\u00a0]")
+	if reLbcPrice == nil {
+		reLbcPrice = regexp.MustCompile("[ €\u00a0]")
 	}
-	p := re_LbcPrice.ReplaceAllLiteralString(price, "")
+	p := reLbcPrice.ReplaceAllLiteralString(price, "")
 	if p == "" {
 		return 0, 0
 	}
@@ -131,13 +132,12 @@ func lbcPriceToInt(price string) (int, int) {
 			panic(fmt.Sprintf("Max price: '%v'; %v", prices[1], err))
 		}
 		return int(MinPrice64), int(MaxPrice64)
-	} else {
-		price64, err := strconv.ParseInt(p, 10, 0)
-		if err != nil {
-			panic(fmt.Sprintf("price: '%v'; %v", price, err))
-		}
-		return int(price64), int(price64)
 	}
+	price64, err := strconv.ParseInt(p, 10, 0)
+	if err != nil {
+		panic(fmt.Sprintf("price: '%v'; %v", price, err))
+	}
+	return int(price64), int(price64)
 }
 
 func getAnnoncePlacement(annNode *html.Node) (string, string, string) {
@@ -169,16 +169,15 @@ func getAnnoncePlacement(annNode *html.Node) (string, string, string) {
 	}
 	f(annNode)
 
-	if re_LbcPlacement == nil {
-		re_LbcPlacement = regexp.MustCompile("[\r\n\t\\s]")
+	if reLbcPlacement == nil {
+		reLbcPlacement = regexp.MustCompile("[\r\n\t\\s]")
 	}
-	placement = re_LbcPlacement.ReplaceAllLiteralString(placement, "")
+	placement = reLbcPlacement.ReplaceAllLiteralString(placement, "")
 	if strings.Contains(placement, "/") {
 		places := strings.Split(placement, "/")
 		return strings.TrimSpace(places[0]), strings.TrimSpace(places[1]), placement
-	} else {
-		return "", placement, placement
 	}
+	return "", placement, placement
 }
 
 func getAnnoncePrice(annNode *html.Node) (int, int, string) {
@@ -250,22 +249,24 @@ func getAnnonceDate(annNode *html.Node) (time.Time, string) {
 	return lbcDateToTime(date[0], date[1])
 }
 
-func (a Annonce) LbcId() string {
-	//http://www.leboncoin.fr/voitures/719527156.htm?ca=22_s
+// LbcID return annonce ID
+func (a Annonce) LbcID() string {
+	// http://www.leboncoin.fr/voitures/719527156.htm?ca=22_s
 	u, err := url.Parse(a.HRef)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if re_LbcId == nil {
-		re_LbcId = regexp.MustCompile(".*/(\\d+)\\.htm")
+	if reLbcID == nil {
+		reLbcID = regexp.MustCompile(".*/(\\d+)\\.htm")
 	}
-	subs := re_LbcId.FindStringSubmatch(u.Path)
+	subs := reLbcID.FindStringSubmatch(u.Path)
 	if len(subs) < 2 || subs[1] == "" {
-		panic("Format error in LbcId")
+		panic("Format error in LbcID")
 	}
 	return subs[1]
 }
 
+// ExtractAnnoncesData returns array of annonce
 func ExtractAnnoncesData(annNodes []*html.Node, category string) []Annonce {
 	annonces := make([]Annonce, len(annNodes))
 

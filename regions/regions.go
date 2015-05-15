@@ -4,16 +4,18 @@ import (
 	"fmt"
 )
 
+// A Region from France and DOMTOM
 type Region struct {
 	Name  string
 	Areas []string
 }
 
 const (
-	DEFAULT_REGION = "rhone"
+	// DefaultRegion to run app
+	DefaultRegion = "rhone"
 )
 
-// Returns regions and there areas
+// Get returns regions and there areas
 func Get() []Region {
 	//http://www.insee.fr/fr/methodes/nomenclatures/cog/telechargement.asp
 	//http://www.pillot.fr/cartographe/fic_villes.php
@@ -216,7 +218,7 @@ func Get() []Region {
 	}
 }
 
-// Return a formated string that suite with flag package help output
+// ToHelpString returns a formated string that suite with flag package help output
 func ToHelpString() string {
 	s := ""
 
@@ -235,7 +237,7 @@ func ToHelpString() string {
 	return s
 }
 
-// Used to confirm a region or and area.
+// GetRegionAndArea has to be used to confirm a region or and area.
 // If regionOrArea is a region, it returns only the region name.
 // If regionOrArea is an area, it returns region and area.
 func GetRegionAndArea(regionOrArea string) (string, string, error) {
