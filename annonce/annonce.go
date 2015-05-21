@@ -125,7 +125,7 @@ func lbcPriceToInt(price string) (int, int) {
 		}
 		MinPrice64, err := strconv.ParseInt(prices[0], 10, 0)
 		if err != nil {
-			panic(fmt.Sprintf("Min price: '%v'; %v", prices[0], err))
+			log.Fatalf("Min price: '%v'; %v", prices[0], err)
 		}
 		MaxPrice64, err := strconv.ParseInt(prices[1], 10, 0)
 		if err != nil {
