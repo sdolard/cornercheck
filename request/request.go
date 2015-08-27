@@ -1,7 +1,6 @@
 package request
 
 import (
-	"cornercheck/annonce"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -9,6 +8,8 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"strings"
+
+	"github.com/sdolard/cornercheck/annonce"
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/charset"

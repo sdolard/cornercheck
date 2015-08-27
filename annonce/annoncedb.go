@@ -12,8 +12,8 @@ const (
 
 // TODO: select * from annonces where date(time)="2015-05-07";
 
-// CreateTable relatice to db
-func CreateTable(db *sql.DB) {
+// CreateAnnonceTable relative to db
+func CreateAnnonceTable(db *sql.DB) {
 	if db == nil {
 		return
 	}

@@ -10,11 +10,11 @@ import (
 	"runtime"
 	"strings"
 
-	"cornercheck/annonce"
-	"cornercheck/categories"
-	"cornercheck/db"
-	"cornercheck/regions"
-	"cornercheck/request"
+	"github.com/sdolard/cornercheck/annonce"
+	"github.com/sdolard/cornercheck/categories"
+	"github.com/sdolard/cornercheck/db"
+	"github.com/sdolard/cornercheck/regions"
+	"github.com/sdolard/cornercheck/request"
 )
 
 func initFlags() (request.AppParams, error) {

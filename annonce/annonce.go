@@ -19,18 +19,18 @@ const (
 
 func getLbcShortMonths() map[string]time.Month {
 	return map[string]time.Month{
-		"jan":  time.January,
-		"fev":  time.February,
-		"mars": time.March,
-		"avr":  time.April,
-		"mai":  time.May,
-		"juin": time.June,
-		"juil": time.July,
-		"août": time.August,
-		"sept": time.September,
-		"oct":  time.October,
-		"nov":  time.November,
-		"déc":  time.December,
+		"jan":     time.January,
+		"fev":     time.February,
+		"mars":    time.March,
+		"avr":     time.April,
+		"mai":     time.May,
+		"juin":    time.June,
+		"juillet": time.July,
+		"août":    time.August,
+		"sept":    time.September,
+		"oct":     time.October,
+		"nov":     time.November,
+		"déc":     time.December,
 	}
 }
 
@@ -94,7 +94,7 @@ func lbcDateToTime(dayS, hourS string) (time.Time, string) {
 		day = int(day64)
 		month = getLbcShortMonths()[decomposedDay[1]]
 		if month == 0 {
-			panic(fmt.Sprintf("Invalid month: %v. dayS: %v; hourS: %v", decomposedDay[1], dayS, hourS))
+			panic(fmt.Sprintf("Invalid month: \"%v\". dayS: \"%v\"; hourS: \"%v\"", decomposedDay[1], dayS, hourS))
 		}
 	}
 
@@ -287,7 +287,7 @@ func ExtractAnnoncesData(annNodes []*html.Node, category string) []Annonce {
 			annonces[i].Town, annonces[i].Area, annonces[i].PlacementString = getAnnoncePlacement(annNodes[i])
 
 		} else {
-			panic("format change")
+			panic("Format change")
 		}
 	}
 
