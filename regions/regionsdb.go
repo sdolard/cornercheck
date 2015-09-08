@@ -15,11 +15,11 @@ const (
 		);
 		`
 	sqlRegionsTableStr = `
-			create table if not exists ` + regionsTableName + ` (
-				id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-				name	TEXT,
+		create table if not exists ` + regionsTableName + ` (
+			id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+			name	TEXT,
 
-			);
+		);
 			`
 )
 

@@ -71,7 +71,7 @@ func main() {
 		printUsage()
 		return
 	}
-
+	runtime.GOMAXPROCS(appParams.NumCPU)
 	dbInstance := createDb()
 	defer db.Close()
 
